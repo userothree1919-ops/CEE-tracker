@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<link rel="manifest" href="manifest.json">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CEE Marks Tracker — Level Edition</title>
+<style>
+:root{
+  --bg1:#fff6fb; --bg2:#f0fbff; --card:#ffffff; --muted:#6b6b6b;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;font-family:system-ui,sans-serif;}
+body{background:linear-gradient(135deg,var(--bg1),var(--bg2));color:#222;padding:14px;}
+.app{max-width:980px;margin:0 auto;}
+header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.brand{background:linear-gradient(90deg,#ffd1e8,#d8c9ff);padding:12px 14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.06);}
+h1{margin:0;font-size:18px;}
+.sub{font-size:13px;color:var(--muted);}
+.tabs{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+.tab{background:rgba(255,255,255,0.9);border:0;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600;}
+.tab.active{background:#ff4fa7;color:white;box-shadow:0 6px 18px rgba(255,79,167,0.16);}
+.layout{display:grid;grid-template-columns:1fr;gap:14px;}
+@media(min-width:900px){.layout{grid-template-columns:2fr 1fr;}}
+.card{background:var(--card);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(16,24,40,0.06);}
+.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap;}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px;}
+input[type="date"],input[type="number"],input[type="text"]{padding:10px;border-radius:10px;border:1px solid #eee;width:100%;font-size:14px;}
+.btn{background:#ff4fa7;color:white;border:0;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700;}
+.muted{color:var(--muted);font-size:13px;}
+.stats-grid{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+.stat{flex:1;min-width:120px;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fafafa);text-align:center;}
+.history-list{max-height:320px;overflow:auto;margin-top:8px;padding-right:6px;}
+.history-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;margin-bottom:8px;background:#fffaf0;border-left:6px solid #ffd966;}
+.small{font-size:13px;color:var(--muted);}
+.rank-badge{font-size:36px;}
+.progress-wrap{background:#eee;border-radius:12px;padding:8px;margin-top:8px;}
+.progress{height:12px;background:linear-gradient(90deg,#ffd1dc,#ff4fa7);border-radius:12px;width:0%;}
+canvas{width:100%;height:280px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0.2));display:block;}
+.controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+.muted-btn{background:transparent;border:1px solid #eee;padding:8px;border-radius:8px;}
+.tiny{font-size:12px;padding:6px 8px;border-radius:8px;}
+.nowrap{white-space:nowrap;}
+.danger{background:#ffecec;border:1px solid #ffb3b3;color:#d64545;}
+.del-btn{background:transparent;border:0;color:#d64545;cursor:pointer;font-weight:700;padding:6px 8px;}
+.tooltip{position:fixed;padding:8px 10px;border-radius:8px;background:#111;color:white;font-size:13px;pointer-events:none;opacity:0;transform:translate(-50%,-120%);transition:opacity .12s;z-index:9999;}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand">
+    <h1>CEE Marks Tracker — Level Edition</h1>
+    <div class="sub">Out of 200 • Single Player</div>
+  </div>
+  <nav class="tabs" aria-label="Main tabs">
+    <button class="tab active" data-tab="tracker">Tracker</button>
+    <button class="tab" data-tab="stats">Stats</button>
+    <button class="tab" data-tab="rank">Rank</button>
+    <button class="tab" data-tab="history">History</button>
+  </nav>
+</header>
+
+<main class="layout">
+<section>
+  <div class="card" id="trackerPanel">
+    <h3>🎯 Add Test Marks</h3>
+    <div class="row" style="margin-top:6px;">
+      <div style="flex:1;">
+        <label>Student Name</label>
+        <input id="nameInput" type="text" placeholder="Enter student name">
+      </div>
+      <div style="flex:1;">
+        <label>Date</label>
+        <input id="dateInput" type="date">
+      </div>
+      <div style="width:120px;">
+        <label>Marks (0–200)</label>
+        <input id="marksInput" type="number" min="0" max="200" step="0.01" placeholder="e.g. 140">
+      </div>
+      <div style="width:100px;display:flex;flex-direction:column;justify-content:flex-end">
+        <button id="addBtn" class="btn">Add</button>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <canvas id="marksChart" aria-label="Marks chart"></canvas>
+    </div>
+
+    <div class="controls">
+      <button id="exportBtn" class="muted-btn tiny">Export CSV</button>
+      <button id="resetBtn" class="muted-btn tiny danger">Clear All</button>
+      <div style="margin-left:auto" class="small nowrap">Hover points to see date, name & marks</div>
+    </div>
+  </div>
+</section>
+
+<aside>
+<div class="card" id="statsPanel" style="display:none;">
+  <h3>📊 Summary</h3>
+  <div class="stats-grid">
+    <div class="stat"><div class="small">Total Tests</div><div id="totalTests">0</div></div>
+    <div class="stat"><div class="small">Average</div><div id="avgMarks">0</div></div>
+    <div class="stat"><div class="small">Highest</div><div id="highMarks">0</div></div>
+    <div class="stat"><div class="small">Lowest</div><div id="lowMarks">0</div></div>
+  </div>
+</div>
+
+<div class="card" id="rankPanel" style="display:none;margin-top:12px;text-align:center;">
+  <h3>🏆 Rank & Progress</h3>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+    <div class="rank-badge" id="rankBadge">—</div>
+    <div id="rankName">—</div>
+    <div class="progress-wrap" style="width:100%;max-width:260px;">
+      <div class="progress" id="rankProgress"></div>
+    </div>
+    <div class="small" id="toNextText"></div>
+  </div>
+</div>
+
+<div class="card" id="historyPanel" style="display:none;margin-top:12px;">
+  <h3>📜 Full History</h3>
+  <div id="historyList" class="history-list small">No history yet.</div>
+</div>
+</aside>
+</main>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+let data=JSON.parse(localStorage.getItem('cee_marks_level')||'[]');
+const tabs=document.querySelectorAll('.tab');
+const trackerPanel=document.getElementById('trackerPanel');
+const statsPanel=document.getElementById('statsPanel');
+const rankPanel=document.getElementById('rankPanel');
+const historyPanel=document.getElementById('historyPanel');
+
+const nameInput=document.getElementById('nameInput');
+const dateInput=document.getElementById('dateInput');
+const marksInput=document.getElementById('marksInput');
+const addBtn=document.getElementById('addBtn');
+const exportBtn=document.getElementById('exportBtn');
+const resetBtn=document.getElementById('resetBtn');
+
+const totalTestsEl=document.getElementById('totalTests');
+const avgMarksEl=document.getElementById('avgMarks');
+const highMarksEl=document.getElementById('highMarks');
+const lowMarksEl=document.getElementById('lowMarks');
+const rankBadgeEl=document.getElementById('rankBadge');
+const rankNameEl=document.getElementById('rankName');
+const rankProgressEl=document.getElementById('rankProgress');
+const toNextTextEl=document.getElementById('toNextText');
+const historyListEl=document.getElementById('historyList');
+
+const canvas=document.getElementById('marksChart');
+const ctx=canvas.getContext('2d');
+if(!dateInput.value) dateInput.value=new Date().toISOString().slice(0,10);
+
+const levels = [
+  {name:'Failed', min:0,color:'#d64545'},
+  {name:'D', min:100,color:'#ffa500'},
+  {name:'C+', min:120,color:'#32cd32'},
+  {name:'B', min:130,color:'#00ced1'},
+  {name:'B+', min:140,color:'#1e90ff'},
+  {name:'A', min:150,color:'#ff6347'},
+  {name:'A+', min:160,color:'#ff7f50'},
+  {name:'S', min:170,color:'#ffb347'},
+  {name:'S+', min:180,color:'#ffd700'}
+];
+
+function saveData(){localStorage.setItem('cee_marks_level',JSON.stringify(data));}
+
+function getRank(score){
+  let current=null,next=null;
+  for(let i=levels.length-1;i>=0;i--){
+    if(score>=levels[i].min){current=levels[i];next=levels[i+1]||null;break;}
+  }
+  return {current,next};
+}
+
+tabs.forEach(t=>t.addEventListener('click',()=>{
+  tabs.forEach(tb=>tb.classList.remove('active')); t.classList.add('active');
+  trackerPanel.style.display='none'; statsPanel.style.display='none'; rankPanel.style.display='none'; historyPanel.style.display='none';
+  if(t.dataset.tab==='tracker') trackerPanel.style.display='block';
+  if(t.dataset.tab==='stats') statsPanel.style.display='block';
+  if(t.dataset.tab==='rank') rankPanel.style.display='block';
+  if(t.dataset.tab==='history') historyPanel.style.display='block';
+  renderAll();
+}));
+
+addBtn.addEventListener('click',()=>{
+  const name=nameInput.value.trim();
+  const date=dateInput.value;
+  const marks=parseFloat(marksInput.value);
+  if(!name) return alert('Enter student name');
+  if(!date||isNaN(marks)||marks<0||marks>200) return alert('Enter valid date & marks (0-200)');
+  data.push({name,date,marks});
+  data.sort((a,b)=>new Date(a.date)-new Date(b.date));
+  saveData();
+  nameInput.value=''; marksInput.value=''; dateInput.value=new Date().toISOString().slice(0,10);
+  renderAll();
+});
+
+exportBtn.addEventListener('click',()=>{
+  if(!data.length) return alert('No data to export.');
+  const csv=[['name','date','marks'],...data.map(d=>[d.name,d.date,d.marks])].map(r=>r.join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='cee_marks_level.csv'; a.click(); URL.revokeObjectURL(url);
+});
+
+resetBtn.addEventListener('click',()=>{if(confirm('Clear all data?')){data=[];saveData();renderAll();}});
+
+function resizeCanvas(){const rect=canvas.getBoundingClientRect();canvas.width=rect.width*devicePixelRatio;canvas.height=rect.height*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);drawChart();}
+window.addEventListener('resize',resizeCanvas);resizeCanvas();
+
+function drawChart(){
+  const w=canvas.width/devicePixelRatio,h=canvas.height/devicePixelRatio;
+  ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+  if(!data.length){ctx.fillStyle='#666';ctx.font='14px sans-serif';ctx.fillText('No data yet',50,h/2);return;}
+  const plotLeft=40,plotRight=w-10,plotTop=20,plotBottom=h-20;
+  const n=data.length; const xs=data.map((_,i)=>plotLeft+(n===1?(plotRight-plotLeft)/2:(i/(n-1))*(plotRight-plotLeft)));
+  const ys=data.map(d=>plotTop+(1-(d.marks/200))*(plotBottom-plotTop));
+
+  // Grid
+  ctx.strokeStyle='#eee'; ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){const y=plotTop+i*(plotBottom-plotTop)/5;ctx.beginPath();ctx.moveTo(plotLeft,y);ctx.lineTo(plotRight,y);ctx.stroke();ctx.fillStyle='#888';ctx.font='12px sans-serif';ctx.fillText(200-i*40,5,y+4);}
+
+  // Line
+  ctx.beginPath(); ctx.lineWidth=2.5; ctx.strokeStyle='#ff4fa7'; ctx.moveTo(xs[0],ys[0]); for(let i=1;i<n;i++) ctx.lineTo(xs[i],ys[i]); ctx.stroke();
+
+  // Points
+  xs.forEach((x,i)=>{ctx.beginPath(); ctx.fillStyle=levels.filter(l=>data[i].marks>=l.min).slice(-1)[0].color; ctx.arc(x,ys[i],5,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#fff';ctx.stroke();});
+  canvas._points=xs.map((x,i)=>({x:x,y:ys[i],index:i,name:data[i].name,date:data[i].date,marks:data[i].marks}));
+}
+
+// Tooltip
+const tooltip=document.getElementById('tooltip');
+canvas.addEventListener('pointermove',function(ev){
+  const rect=canvas.getBoundingClientRect(); const px=ev.clientX-rect.left; const py=ev.clientY-rect.top;
+  if(!canvas._points) return tooltip.style.opacity=0;
+  let found=null; for(const p of canvas._points){const dx=p.x-px,dy=p.y-py;if(dx*dx+dy*dy<=12*12){found=p;break;}}
+  if(found){tooltip.style.left=ev.clientX+'px';tooltip.style.top=ev.clientY+'px';tooltip.innerHTML=`<b>${found.date}</b><br><b>${found.name}</b><br>${found.marks}/200`;tooltip.style.opacity=1;} else tooltip.style.opacity=0;
+});
+canvas.addEventListener('pointerleave',()=>tooltip.style.opacity=0);
+
+function renderAll(){
+  const total=data.length; totalTestsEl.textContent=total;
+  if(!total){avgMarksEl.textContent='0';highMarksEl.textContent='0';lowMarksEl.textContent='0';historyListEl.innerHTML='No history yet';rankBadgeEl.textContent='—';rankNameEl.textContent='—';rankProgressEl.style.width='0%';toNextTextEl.textContent='';drawChart();return;}
+  const marksArr=data.map(d=>d.marks); const sum=marksArr.reduce((a,b)=>a+b,0); avgMarksEl.textContent=(sum/total).toFixed(2); highMarksEl.textContent=Math.max(...marksArr); lowMarksEl.textContent=Math.min(...marksArr);
+
+  // History
+  historyListEl.innerHTML=''; for(let i=0;i<data.length;i++){
+    const d=data[i]; let diffText=''; if(i>0){const diff=d.marks-data[i-1].marks;diffText=diff>0?`↑ ${diff}`:diff<0?`↓ ${-diff}`:'';}
+    const div=document.createElement('div'); div.className='history-item'; div.innerHTML=`<div>${d.date} — ${d.name}</div><div>${d.marks}/200 ${diffText}</div>`; historyListEl.appendChild(div);
+  }
+
+  // Rank based on latest score
+  const latest=data[data.length-1].marks;
+  const {current,next}=getRank(latest);
+  rankBadgeEl.textContent=current.name;
+  rankNameEl.textContent=`${current.name} — latest score ${latest}/200`;
+
+  // Progress Bar (Proportional)
+  if(next){
+      const range = next.min - current.min;
+      const progress = latest - current.min;
+      const percent = Math.max(0, Math.min(100, (progress / range) * 100));
+      rankProgressEl.style.width = percent + '%';
+      toNextTextEl.textContent = `Need ${next.min - latest} more marks to reach ${next.name}`;
+  } else {
+      rankProgressEl.style.width = '100%';
+      toNextTextEl.textContent = 'Top rank reached';
+  }
+
+  drawChart();
+}
+renderAll();
+</script>
+</body>
+</html>
